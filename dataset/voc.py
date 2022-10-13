@@ -1,6 +1,7 @@
 """
     self-defined voc dataset class
 """
+
 import torch
 from PIL import Image
 import json
@@ -8,9 +9,12 @@ from lxml import etree
 import os
 from torch.utils.data import Dataset
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torchvision.transforms as ts
 import random
-from dataset import transforms
+import transforms
+from utils.draw_box import draw_objs
 
 
 class VOCDataset(Dataset):
@@ -38,7 +42,7 @@ class VOCDataset(Dataset):
         txt_path = os.path.join(self.path, "ImageSets", "Main",
                                 "train.txt" if is_train else "val.txt")
         with open(txt_path) as txt_f:
-            xml_path_list = [os.path.join(self.annotations_root, "{}.xml".format(line.strip()))
+            xml_path_list = [os.path.join(self.anno_path, "{}.xml".format(line.strip()))
                              for line in txt_f.readlines() if len(line.strip()) > 0]
         self.xml_list = []
         for xml_path in xml_path_list:
@@ -55,8 +59,8 @@ class VOCDataset(Dataset):
             "train" if is_train else "val")
 
         # load class dict with json file
-        class_json_file = "./pascal_voc_classes.json"
-        assert os.path.exits(class_json_file), "Error: {} file not exist.".format(class_json_file)
+        class_json_file = "./dataset/pascal_voc_classes.json"
+        assert os.path.exists(class_json_file), "Error: {} file not exist.".format(class_json_file)
         with open(class_json_file) as json_f:
             self.class_dict = json.load(json_f)
         # save image transform manipulations
@@ -76,7 +80,7 @@ class VOCDataset(Dataset):
         :return: data consist of image and it label
         """
         # load xml dict
-        xml_path = self.xml_list(item)
+        xml_path = self.xml_list[item]
         data_dict = self.load_xml_file(xml_path)["annotation"]
         img_path = os.path.join(self.img_path, data_dict["filename"])
 
@@ -99,7 +103,7 @@ class VOCDataset(Dataset):
                 print("Warning: in {} xml, there are som bbox w/h <= 0".format(xml_path))
                 continue
             bboxes.append([xmin, ymin, xmax, ymax])
-            labels.append([self.class_dict[obj["name"]]])
+            labels.append(self.class_dict[obj["name"]])
             if "difficult" in obj:
                 is_difficult.append(int(obj["difficult"]))
             else:
@@ -152,27 +156,27 @@ class VOCDataset(Dataset):
         """
 
         if len(xml) == 0:
-            return {xml.tag, xml.text}
+            return {xml.tag: xml.text}
 
         result = {}
         for child in xml:
-            child_result = self.parse_xml_todict(child)
-            if child.tag == 'ojbect':
+            child_result = self.parse_xml_to_dict(child)
+            if child.tag == 'object':
                 if child.tag not in result:
                     result[child.tag] = []
                 result[child.tag].append(child_result[child.tag])
             else:
                 result[child.tag] = child_result[child.tag]
-        return {xml.tag, result}
+        return {xml.tag: result}
 
 
 if __name__ == '__main__':
     # load class index
     category_index = {}
     try:
-        json_f = open('./pascal_voc_classes.json', 'r')
+        json_f = open('./dataset/pascal_voc_classes.json', 'r')
         class_dict = json.load(json_f)
-        category_index = {str(v): str(k) for k, v in class_dict.item()}
+        category_index = {str(v): str(k) for k, v in class_dict.items()}
     except Exception as e:
         print(e)
         exit(-1)
@@ -185,7 +189,20 @@ if __name__ == '__main__':
 
     # load train dataset
     train_dataset = VOCDataset("./", "2012", data_transform["train"], True)
-    print(len(train_dataset))
-    for index in random.sample(range(len(train_dataset)), k = 5):
+    # draw image with objection detectin information
+    _, axes = plt.subplots(2, 3, figsize = (4.5, 4.5))
+    axes = axes.flatten()
+    for index, ax in zip(random.sample(range(len(train_dataset)), k = 6), axes):
         img, target = train_dataset[index]
-        img = ts.ToTensor(img)
+        img = ts.ToPILImage()(img)
+        plot_img = draw_objs(img, target["bboxes"].numpy(), target["labels"].numpy(),
+                             np.ones(target["labels"].shape[0]),
+                             category_index = category_index, box_thresh = 0.5,
+                             line_thickness = 3, font = 'arial.ttf',
+                             font_size = 20)
+        ax.imshow(img)
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+    plt.show()
+
+

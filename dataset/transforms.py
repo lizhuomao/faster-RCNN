@@ -24,7 +24,7 @@ class ToTensor(object):
     """
 
     def __call__(self, image, target):
-        image = F.to_tensor()
+        image = F.to_tensor(image)
         return image, target
 
 
@@ -40,7 +40,7 @@ class RandomHorizontalFlip(object):
             height, width = image.shape[-2:]
             image = image.flip(-1)
             bboxes = target["bboxes"]
-            bboxes[: [0, 2]] = width - bboxes[:, [2, 0]]
+            bboxes[:, [0, 2]] = width - bboxes[:, [2, 0]]
             target["bboxes"] = bboxes
             target["bboxes"] = bboxes
         return image, target

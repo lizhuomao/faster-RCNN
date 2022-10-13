@@ -6,7 +6,8 @@ import PIL.ImageDraw as ImageDraw
 from PIL import ImageColor
 import numpy as np
 from PIL import Image
-
+from PIL.Image import fromarray
+import PIL.ImageFont as ImageFont
 
 STANDARD_COLORS = [
     'AliceBlue', 'Chartreuse', 'Aqua', 'Aquamarine', 'Azure', 'Beige', 'Bisque',
@@ -35,20 +36,54 @@ STANDARD_COLORS = [
 ]
 
 
+def draw_masks(image, masks, colors, thresh: float = 0.7, alpha: float = 0.5):
+    np_image = np.array(image)
+    masks = np.where(masks > thresh, True, False)
+    img_to_draw = np.copy(np_image)
+    for mask, color in zip(masks, colors):
+        img_to_draw[mask] = color
+
+    out = np_image * (1 - alpha) + img_to_draw * alpha
+    return fromarray(out.astype(np.uint8))
+
+
 def draw_text(draw, bbox: list, cls: int, score: float, category_index: dict,
-              color: str, font: str = 'arial.ttf', font_size = 24):
+              color: str, font: str = 'arial.ttf', font_size=24):
     """
-    draw object bounding box and class information onto image
-    :param draw:
-    :param bbox:
-    :param cls:
-    :param score:
-    :param category_index:
-    :param color:
-    :param font:
-    :param font_size:
-    :return:
+    draw object detection information onto image
+    :param draw: ImageDraw.Draw()
+    :param bbox: bounding box
+    :param cls: object class information
+    :param score: object probability
+    :param category_index: category dictionary
+    :param color: box line color
+    :param font: font type
+    :param font_size: font size
+    :return: image with draw information
     """
+    try:
+        font = ImageFont.truetype(font, font_size)
+    except IOError:
+        font = ImageFont.load_default()
+
+    left, top, right, bottom = bbox
+    display_str = "{} : {}%".format(category_index[str(cls)], int(100 * score))
+    display_str_heights = [font.getsize(ds)[1] for ds in display_str]
+    display_str_heights = (1 + 2 * 0.05) * max(display_str_heights)
+    if top > display_str_heights:
+        text_top = top - display_str_heights
+        text_bottom = top
+    else:
+        text_top = bottom
+        text_bottom = bottom + display_str_heights
+
+    for ds in display_str:
+        text_width, text_height = font.getsize(ds)
+        margin = np.ceil(0.05 * text_width)
+        draw.rectangle([(left, text_top),
+                        (left + text_width + 2 * margin, text_bottom)], fill=color)
+        draw.text((left + margin, text_top), ds, fill='black', font=font)
+        left += text_width
 
 
 def draw_objs(image: Image,
@@ -91,17 +126,18 @@ def draw_objs(image: Image,
         masks = masks[idx]
     if len(bboxes) == 0:
         return image
-
     colors = [ImageColor.getrgb(STANDARD_COLORS[cls % len(STANDARD_COLORS)]) for cls in classes]
     if draw_boxes_on_image:
-        # Draw all bboxes onto image
+        # Draw all bboxes and object detection onto image
         draw = ImageDraw.Draw(image)
         for bbox, cls, score, color in zip(bboxes, classes, scores, colors):
             left, top, right, bottom = bbox
             draw.line([(left, top), (left, bottom), (right, bottom),
-                       (right, top), (left, top)], width = line_thickness, fill = color)
-            draw.text(draw, bbox.tolist(), int(cls), float(score), category_index, color,
+                       (right, top), (left, top)], width=line_thickness, fill=color)
+            draw_text(draw, bbox.tolist(), int(cls), float(score), category_index, color,
                       font, font_size)
+    if draw_masks_on_image and (masks is not None):
+        # Draw all mask onto image.
+        image = draw_masks(image, masks, colors, mask_thresh)
 
     return image
-
