@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torchvision.transforms as ts
 import random
-import transforms
+from utils import transforms
 from utils.draw_box import draw_objs
 
 

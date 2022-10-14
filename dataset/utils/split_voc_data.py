@@ -6,7 +6,7 @@ import random
 
 def main():
     # find the voc dataset indices
-    voc_anno_path = "../FASTER RCNN/VOCdevkit/VOC2012/Annotations/"
+    voc_anno_path = "./VOCdevkit/VOC2012/Annotations/"
     files_name = [file_name.split(".")[0] for file_name in os.listdir(voc_anno_path)]
     files_num = len(files_name)
 
