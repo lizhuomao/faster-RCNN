@@ -185,3 +185,29 @@ class AnchorsGenerator(nn.Module):
         anchors = [torch.cat(anchors_per_image) for anchors_per_image in anchors]
         self._cache.clear()
         return anchors
+
+
+class RegionProposalNetwork(nn.Module):
+    """
+    Implements Region Proposal Network(RPN)
+    """
+    def __init__(self, anchor_generator, head, fg_iou_thresh, bg_iou_thresh,
+                 batch_size_per_image, positive_fraction, pre_nms_top_n,
+                 post_nms_top_n, nms_thresh, score_thresh=0.0):
+        """
+        initialization
+        :param anchor_generator: module of generate anchor
+        :param head: module of computes the objectness and regression
+        :param fg_iou_thresh: minimum IoU between the anchor and the ground truth
+        :param bg_iou_thresh: maximum IoU ...
+        :param batch_size_per_image: number of anchors that are sampled during training of the RPN for computing the loss
+        :param positive_fraction: proportion of positive anchors
+        :param pre_nms_top_n: number of proposals to keep before applying NMS
+        :param post_nms_top_n: number of proposals to keep after applying NMS
+        :param nms_thresh: NMS threshold
+        :param score_thresh:
+        """
+        super(RegionProposalNetwork, self).__init__()
+        self.anchor_generator = anchor_generator
+        self.head = head
+        
